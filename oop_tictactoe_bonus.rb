@@ -158,7 +158,7 @@ end
 
 class TTTGame
   FIRST_TO_MOVE = "choose".freeze # 'human', 'computer', or 'choose'
-  WIN_SCORE = 2
+  WIN_SCORE = 5
 
   attr_reader :board, :human, :computer, :keep_playing
 
