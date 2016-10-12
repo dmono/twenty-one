@@ -80,7 +80,7 @@ class Board
 end
 
 class Square
-  INITIAL_MARKER = " "
+  INITIAL_MARKER = " ".freeze
 
   attr_accessor :marker
 
@@ -101,7 +101,7 @@ class Square
   end
 end
 
-class Player
+class Participant
   attr_accessor :marker, :name, :score
 
   def initialize
@@ -109,26 +109,58 @@ class Player
     @name = ""
     @score = 0
   end
+
+  def increment_score
+    self.score += 1
+  end
+
+  def reset_score
+    self.score = 0
+  end
 end
 
-class Computer
-  attr_accessor :marker, :name, :score
+class Player < Participant
+  def set_name
+    choice = nil
+    loop do
+      puts "Please enter your name:"
+      choice = gets.chomp
+      break unless choice.strip.empty?
+      puts "Sorry, that is not a valid entry."
+    end
+    self.name = choice
+  end
 
-  def initialize
-    @marker = ""
-    @name = ""
-    @score = 0
+  def set_marker
+    choice = nil
+    loop do
+      puts "Pick your marker: X or O"
+      choice = gets.chomp.upcase
+      break if %w(X O).include? choice
+      puts "Sorry, that is not a valid choice."
+    end
+    self.marker = choice
+  end
+end
+
+class Computer < Participant
+  COMPUTER_NAMES = %w(Jon Arya Sansa Robb Ned Catelyn Bran
+                      Daenerys Rickon).freeze
+
+  def set_name
+    self.name = COMPUTER_NAMES.sample
+  end
+
+  def assign_marker(opponent)
+    self.marker = opponent.marker == 'X' ? 'O' : 'X'
   end
 end
 
 class TTTGame
-  FIRST_TO_MOVE = "choose" # 'human', 'computer', or 'choose'
-  WIN_SCORE = 5
-  COMPUTER_NAMES = %w(Jon Arya Sansa Robb Ned Caitlyn Bran
-                      Daenerys Rickon).freeze
+  FIRST_TO_MOVE = "choose".freeze # 'human', 'computer', or 'choose'
+  WIN_SCORE = 2
 
-  attr_reader :board, :human, :computer, :human_score, :computer_score,
-              :exit_round
+  attr_reader :board, :human, :computer, :keep_playing
 
   def initialize
     @board = Board.new
@@ -136,44 +168,18 @@ class TTTGame
     @computer = Computer.new
     @first_player = nil
     @current_marker = nil
-    @exit_round = false
+    @keep_playing = nil
   end
 
   def play
-    clear
-    display_welcome_message
-    set_human_name
+    game_setup
 
     loop do
-      set_computer_name
-      display_names
-      pick_marker
-      set_computer_marker
-      set_first_player
-      set_current_marker
+      round_setup
+      round_play
 
-      loop do
-        display_board
-
-        loop do
-          current_player_moves
-          break if board.someone_won? || board.full?
-          clear_screen_and_display_board if human_turn?
-        end
-
-        update_score
-        display_result
-        display_score
-        break if game_winner?
-        break unless start_next_round?
-        reset
-        display_new_round_message
-      end
-      break if exit_round
-      break unless play_again?
-      reset
-      score_reset
-      display_play_again_message
+      break if !keep_playing || !play_again?
+      reset_game
     end
 
     display_goodbye_message
@@ -187,43 +193,9 @@ class TTTGame
     puts ""
   end
 
-  def set_human_name
-    name = nil
-    loop do
-      puts "Please enter your name:"
-      name = gets.chomp
-      break if !name.empty?
-      puts "Sorry, that is not a valid entry."
-    end
-    human.name = name
-  end
-
-  def set_computer_name
-    computer.name = COMPUTER_NAMES.sample
-  end
-
   def display_names
     puts "Hi #{human.name}! Your opponent is #{computer.name}."
     puts ""
-  end
-
-  def pick_marker
-    marker = nil
-    loop do
-      puts "Pick your marker: X or O"
-      marker = gets.chomp
-      break if %w(x o).include?(marker.downcase)
-      puts "Sorry, that is not a valid choice."
-    end
-    human.marker = marker.upcase
-  end
-
-  def set_computer_marker
-    computer.marker = if human.marker == 'X'
-                        'O'
-                      else
-                        'X'
-                      end
   end
 
   def set_first_player
@@ -237,25 +209,64 @@ class TTTGame
   end
 
   def choose_first_player
-    first = nil
+    choice = nil
     loop do
       puts "Choose the first player to move: (y)ou, (c)omputer or (r)andom"
-      first = gets.chomp
-      break if %(y c r).include?(first)
+      choice = gets.chomp.downcase
+      break if %(y c r).include?(choice)
       puts "Sorry, that's not a valid choice. Enter y, c, or r."
     end
 
-    @first_player = if first == 'y'
+    @first_player = if choice == 'y'
                       human.marker
-                    elsif first == 'c'
+                    elsif choice == 'c'
                       computer.marker
                     else
                       [human.marker, computer.marker].sample
                     end
   end
 
+  def game_setup
+    clear
+    display_welcome_message
+    human.set_name
+  end
+
+  def round_setup
+    computer.set_name
+    display_names
+    human.set_marker
+    computer.assign_marker(human)
+    set_first_player
+    set_current_marker
+  end
+
   def set_current_marker
     @current_marker = @first_player
+  end
+
+  def round_play
+    loop do
+      display_board
+
+      loop do
+        current_player_moves
+        break if board.someone_won? || board.full?
+        clear_screen_and_display_board if human_turn?
+      end
+
+      update_score
+      round_results
+      break if game_winner?
+      @keep_playing = start_next_round?
+      break unless keep_playing
+      reset_round
+    end
+  end
+
+  def round_results
+    display_result
+    display_score
   end
 
   def display_goodbye_message
@@ -345,9 +356,9 @@ score: #{computer.score}"
   def update_score
     case board.winning_marker
     when human.marker
-      human.score += 1
+      human.increment_score
     when computer.marker
-      computer.score += 1
+      computer.increment_score
     end
   end
 
@@ -364,7 +375,6 @@ score: #{computer.score}"
       puts "Sorry, must be y or n."
     end
 
-    @exit_round = true if answer == 'n'
     answer == 'y'
   end
 
@@ -384,25 +394,17 @@ score: #{computer.score}"
     system 'clear'
   end
 
-  def reset
+  def reset_round
     board.reset
     @current_marker = @first_player
     clear
   end
 
-  def score_reset
-    human.score = 0
-    computer.score = 0
-  end
-
-  def display_new_round_message
-    puts "Let's start the next round!"
-    puts ""
-  end
-
-  def display_play_again_message
-    puts "Let's play again!"
-    puts ""
+  def reset_game
+    reset_round
+    human.reset_score
+    computer.reset_score
+    computer.set_name
   end
 end
 
