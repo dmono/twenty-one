@@ -251,6 +251,7 @@ class TTTGame
 
       loop do
         current_player_moves
+        alternate_player
         break if board.someone_won? || board.full?
         clear_screen_and_display_board if human_turn?
       end
@@ -324,11 +325,17 @@ an #{computer.marker}."
   def current_player_moves
     if human_turn?
       human_moves
-      @current_marker = computer.marker
     else
       computer_moves
-      @current_marker = human.marker
     end
+  end
+
+  def alternate_player
+    @current_marker = if @current_marker == human.marker
+                        computer.marker
+                      else
+                        human.marker
+                      end
   end
 
   def display_result
