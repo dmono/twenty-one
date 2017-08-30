@@ -1,4 +1,4 @@
-### Twenty-one
+# Twenty-one
 
 A terminal-based version of the class twenty-one card game.
 
